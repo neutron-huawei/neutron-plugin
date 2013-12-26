@@ -1,0 +1,35 @@
+K 25
+svn:wc:ra_dav:version-url
+V 96
+/svn/sdn/!svn/ver/61/branches/01.%E4%BB%A3%E7%A0%81/Initial%20Framework/ml2_huawei_driver/huawei
+END
+__init__.py
+K 25
+svn:wc:ra_dav:version-url
+V 108
+/svn/sdn/!svn/ver/60/branches/01.%E4%BB%A3%E7%A0%81/Initial%20Framework/ml2_huawei_driver/huawei/__init__.py
+END
+clients.py
+K 25
+svn:wc:ra_dav:version-url
+V 107
+/svn/sdn/!svn/ver/60/branches/01.%E4%BB%A3%E7%A0%81/Initial%20Framework/ml2_huawei_driver/huawei/clients.py
+END
+exceptions.py
+K 25
+svn:wc:ra_dav:version-url
+V 110
+/svn/sdn/!svn/ver/60/branches/01.%E4%BB%A3%E7%A0%81/Initial%20Framework/ml2_huawei_driver/huawei/exceptions.py
+END
+config.py
+K 25
+svn:wc:ra_dav:version-url
+V 106
+/svn/sdn/!svn/ver/60/branches/01.%E4%BB%A3%E7%A0%81/Initial%20Framework/ml2_huawei_driver/huawei/config.py
+END
+mechanism_huawei.py
+K 25
+svn:wc:ra_dav:version-url
+V 116
+/svn/sdn/!svn/ver/61/branches/01.%E4%BB%A3%E7%A0%81/Initial%20Framework/ml2_huawei_driver/huawei/mechanism_huawei.py
+END

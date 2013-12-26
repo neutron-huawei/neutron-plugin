@@ -1,0 +1,311 @@
+# vim: tabstop=4 shiftwidth=4 softtabstop=4
+# Copyright (c) 2013 OpenStack Foundation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+# implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import mock
+from oslo.config import cfg
+
+import neutron.db.api as ndb
+from neutron.plugins.ml2.drivers.huawei import mechanism_huawei as huawei
+from neutron.tests import base
+
+
+class HuaweiDriverTestCase(base.BaseTestCase):
+    """
+    Test cases to test the huawei nos driver
+    """
+
+    def setUp(self):
+        super(HuaweiDriverTestCase, self).setUp()
+        #setup_valid_config()
+        self.driver = huawei.HuaweiDriver()
+        self.driver.client_sdn = mock.MagicMock()
+
+    def test_create_network_postcommit(self):
+        tenant_id = 'tenant-1'
+        network_id = 'net-1'
+        segmentation_id = 10001
+        network_context = self._get_network_context(tenant_id,
+                                                    network_id,
+                                                    segmentation_id)
+
+        self.driver._get_mapped_network_with_subnets = mock.MagicMock()
+        net_info = network_context.current
+        net_info['state'] = 'UP'
+        net_info['router:external'] = False
+        net_info['subnets'] = []
+        self.driver._get_mapped_network_with_subnets.return_value = net_info
+
+        self.driver.create_network_postcommit(network_context)
+
+        self.driver.client_sdn.rest_create_network.assert_called_once_with(tenant_id,
+                                                                           net_info)
+
+    def test_update_network_postcommit(self):
+        original_network = {'id': 'net-1',
+                            'tenant_id': 'tenant-1',
+                            'name': 'net-name-1'}
+        new_network = {'id': 'net-1',
+                       'tenant_id': 'tenant-1',
+                       'name': 'net-name-2'}
+        network_segments = [{'segmentation_id': 10001}]
+        network_context = FakeNetworkContext(new_network, network_segments, original_network)
+
+        self.driver._get_mapped_network_with_subnets = mock.MagicMock()
+        net_info = network_context.current
+        net_info['state'] = 'UP'
+        net_info['router:external'] = False
+        net_info['subnets'] = []
+        self.driver._get_mapped_network_with_subnets.return_value = net_info
+
+        self.driver.update_network_postcommit(network_context)
+
+        self.driver.client_sdn.rest_update_network.assert_called_once_with('tenant-1', 'net-1',
+                                                                           net_info)
+
+    def test_delete_network_postcommit(self):
+        tenant_id = 'tenant-1'
+        network_id = 'net-1'
+        segmentation_id = 10001
+        network_context = self._get_network_context(tenant_id,
+                                                    network_id,
+                                                    segmentation_id)
+
+        self.driver.delete_network_postcommit(network_context)
+
+        self.driver.client_sdn.rest_delete_network.assert_called_once_with(tenant_id,
+                                                                           network_id)
+
+
+    def test_create_port_postcommit(self):
+        tenant_id = 'tenant-1'
+        network_id = 'net-1'
+        segmentation_id = 10001
+        vm_id = 'vm-1'
+
+        network_context = self._get_network_context(tenant_id,
+                                                    network_id,
+                                                    segmentation_id)
+
+        port_context = self._get_port_context(tenant_id,
+                                              network_id,
+                                              vm_id,
+                                              network_context)
+
+        self.driver.db_base_plugin_v2._get_network = mock.MagicMock()
+        self.driver.db_base_plugin_v2._get_network.return_value = network_context.current
+
+        self.driver.create_port_postcommit(port_context)
+
+        self.driver.client_sdn.rest_create_port.assert_called_once_with(network_context.current,
+                                                                        port_context.current)
+
+        self.driver.client_sdn.rest_plug_interface.assert_called_once_with(tenant_id, network_id,
+                                                                           port_context.current, vm_id)
+
+
+    def test_delete_port_postcommit(self):
+        tenant_id = 'tenant-1'
+        network_id = 'net-1'
+        segmentation_id = 10001
+        vm_id = 'vm-1'
+
+        network_context = self._get_network_context(tenant_id,
+                                                    network_id,
+                                                    segmentation_id)
+
+        port_context = self._get_port_context(tenant_id,
+                                              network_id,
+                                              vm_id,
+                                              network_context)
+
+        self.driver.delete_port_postcommit(port_context)
+
+        self.driver.client_sdn.rest_delete_port.assert_called_once_with(tenant_id, network_id,
+                                                                        port_context.current['id'])
+
+        self.driver.client_sdn.rest_unplug_interface.assert_called_once_with(tenant_id, network_id,
+                                                                             port_context.current['id'])
+
+    def test_create_subnet_postcommit(self):
+        tenant_id = 'tenant-1'
+        network_id = 'net-1'
+        segmentation_id = 10001
+
+        network_context = self._get_network_context(tenant_id,
+                                                    network_id,
+                                                    segmentation_id)
+
+        self.driver.db_base_plugin_v2._get_network = mock.MagicMock()
+        self.driver.db_base_plugin_v2._get_network.return_value = network_context.current
+
+        subnet_context = self._get_subnet_context(tenant_id,
+                                                  network_id)
+
+        self.driver._get_mapped_network_with_subnets = mock.MagicMock()
+        net_info = network_context.current
+        net_info['state'] = 'UP'
+        net_info['router:external'] = False
+        net_info['subnets'] = [subnet_context.current]
+
+        self.driver._get_mapped_network_with_subnets.return_value = net_info
+
+        self.driver.create_subnet_postcommit(subnet_context)
+
+        self.driver.client_sdn.rest_update_network.assert_called_once_with(tenant_id, network_id, net_info)
+
+
+    def test_update_subnet_postcommit(self):
+        tenant_id = 'tenant-1'
+        network_id = 'net-1'
+        segmentation_id = 10001
+
+        network_context = self._get_network_context(tenant_id,
+                                                    network_id,
+                                                    segmentation_id)
+
+        self.driver.db_base_plugin_v2._get_network = mock.MagicMock()
+        self.driver.db_base_plugin_v2._get_network.return_value = network_context.current
+
+        subnet_context = self._get_subnet_context(tenant_id,
+                                                  network_id)
+
+        self.driver._get_mapped_network_with_subnets = mock.MagicMock()
+        net_info = network_context.current
+        net_info['state'] = 'UP'
+        net_info['router:external'] = False
+        net_info['subnets'] = [subnet_context.current]
+
+        self.driver._get_mapped_network_with_subnets.return_value = net_info
+
+        self.driver.update_subnet_postcommit(subnet_context)
+
+        self.driver.client_sdn.rest_update_network.assert_called_once_with(tenant_id, network_id, net_info)
+
+    def test_delete_subnet_postcommit(self):
+        tenant_id = 'tenant-1'
+        network_id = 'net-1'
+        segmentation_id = 10001
+
+        network_context = self._get_network_context(tenant_id,
+                                                    network_id,
+                                                    segmentation_id)
+
+        self.driver.db_base_plugin_v2._get_network = mock.MagicMock()
+        self.driver.db_base_plugin_v2._get_network.return_value = network_context.current
+
+        subnet_context = self._get_subnet_context(tenant_id,
+                                                  network_id)
+
+        self.driver._get_mapped_network_with_subnets = mock.MagicMock()
+        net_info = network_context.current
+        net_info['state'] = 'UP'
+        net_info['router:external'] = False
+        net_info['subnets'] = []
+
+        self.driver._get_mapped_network_with_subnets.return_value = net_info
+
+        self.driver.delete_subnet_postcommit(subnet_context)
+
+        self.driver.client_sdn.rest_update_network.assert_called_once_with(tenant_id, network_id, net_info)
+
+
+    def _get_network_context(self, tenant_id, net_id, seg_id):
+        network = {'id': net_id,
+                   'tenant_id': tenant_id}
+        network_segments = [{'segmentation_id': seg_id}]
+        return FakeNetworkContext(network, network_segments, network)
+
+    def _get_port_context(self, tenant_id, net_id, vm_id, network):
+        port = {'device_id': vm_id,
+                'device_owner': 'compute',
+                'binding:host_id': 'ubuntu1',
+                'tenant_id': tenant_id,
+                'id': 101,
+                'network_id': net_id
+        }
+        return FakePortContext(port, port, network)
+
+    def _get_subnet_context(self, tenant_id, net_id):
+        subnet = {'name': 'subnet-1',
+                  'id': 'subnet-id-1',
+                  'ip_version': 4,
+                  'cidr': '128.2.2.0/24',
+                  'gateway_ip': '128.2.2.1',
+                  'network_id': net_id,
+                  'tenant_id': tenant_id
+        }
+        return FakeSubnetContext(subnet, subnet)
+
+
+class FakeNetworkContext(object):
+    """To generate network context for testing purposes only."""
+
+    def __init__(self, network, segments=None, original_network=None):
+        self._network = network
+        self._original_network = original_network
+        self._segments = segments
+
+    @property
+    def current(self):
+        return self._network
+
+    @property
+    def original(self):
+        return self._original_network
+
+    @property
+    def network_segments(self):
+        return self._segments
+
+
+class FakePortContext(object):
+    """To generate port context for testing purposes only."""
+
+    def __init__(self, port, original_port, network):
+        self._port = port
+        self._original_port = original_port
+        self._network_context = network
+
+    @property
+    def current(self):
+        return self._port
+
+    @property
+    def original(self):
+        return self._original_port
+
+    @property
+    def network(self):
+        return self._network_context
+
+
+class FakeSubnetContext(object):
+    """To generate subnet context for testing purposes only."""
+
+    def __init__(self, subnet, original_subnet=None):
+        self._subnet = subnet
+        self._original_subnet = original_subnet
+
+    @property
+    def current(self):
+        return self._subnet
+
+    @property
+    def original(self):
+        return self._original_subnet
+    
+    
+
