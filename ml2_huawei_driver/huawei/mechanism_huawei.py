@@ -42,6 +42,7 @@ class HuaweiDriver(driver_api.MechanismDriver):
     Does not send network provisioning request if the network has already been
     provisioned before for the given port.
     """
+
     def __init__(self):
 
         confg = cfg.CONF.ml2_Huawei
@@ -49,11 +50,11 @@ class HuaweiDriver(driver_api.MechanismDriver):
         self.timer = None
         self.db_base_plugin_v2 = db_base_plugin_v2.NeutronDbPluginV2()
         self.external_net_db = external_net_db.External_net_db_mixin()
-#         self.sdn = SyncService(self.rpc, self.ndb)
+        #         self.sdn = SyncService(self.rpc, self.ndb)
         self.sync_timeout = confg['sync_interval']
         self.cxt = qcontext.get_admin_context()
         self.sdn_sync_lock = threading.Lock()
-        self.client_sdn = clients.SdnClient("128.100.1.7", 8080)
+        self.client_sdn = clients.SdnClient(confg.nos_host, confg.nos_port)
 
     def initialize(self):
         LOG.info("huawei driver instance build...")
@@ -66,11 +67,11 @@ class HuaweiDriver(driver_api.MechanismDriver):
         network_id = network['id']
         tenant_id = network['tenant_id']
         LOG.info("network_id = [%s] tenant_id = [%s]" \
-                  % (network_id, tenant_id))
+                 % (network_id, tenant_id))
         with self.sdn_sync_lock:
             try:
                 mapped_network = self._get_mapped_network_with_subnets(
-                                                               network)
+                    network)
                 LOG.info("mapped_network = [%s]" % mapped_network)
                 # create network on the network controller
                 self.client_sdn.rest_create_network(tenant_id,
@@ -143,7 +144,7 @@ class HuaweiDriver(driver_api.MechanismDriver):
         # device_id and device_owner are set on VM boot
         is_vm_boot = device_id and device_owner
         if host and is_vm_boot:
-            network_id = port['network_id'] 
+            network_id = port['network_id']
             net = self.db_base_plugin_v2._get_network(self.cxt, network_id)
             try:
                 self.client_sdn.rest_create_port(net, port)
@@ -156,9 +157,9 @@ class HuaweiDriver(driver_api.MechanismDriver):
             net_id = net["id"]
             try:
                 self.client_sdn.rest_plug_interface(tenant_id,
-                                                     net_id,
-                                                     port,
-                                                     device_id)
+                                                    net_id,
+                                                    port,
+                                                    device_id)
             except RemoteRestError:
                 LOG.error("plug interface %s to server %s failed,reason:%s"
                           % (port['id'], device_id, sdn_UNREACHABLE_MSG))
@@ -222,7 +223,7 @@ class HuaweiDriver(driver_api.MechanismDriver):
         context = qcontext.get_admin_context()
         try:
             with self.sdn_sync_lock:
-                orig_net = self.get_network(context, net_id)
+                orig_net = self.db_base_plugin_v2.get_network(context, net_id)
                 # update network on network controller
                 self._send_update_network(orig_net, context)
         except RemoteRestError:
@@ -235,7 +236,7 @@ class HuaweiDriver(driver_api.MechanismDriver):
         net_id = subnet['network_id']
         try:
             with self.sdn_sync_lock:
-                orig_net = self.get_network(context, net_id)
+                orig_net = self.db_base_plugin_v2.get_network(context, net_id)
                 # update network on network controller
                 self._send_update_network(orig_net, context)
         except RemoteRestError:
@@ -248,7 +249,7 @@ class HuaweiDriver(driver_api.MechanismDriver):
         net_id = subnet['network_id']
         try:
             with self.sdn_sync_lock:
-                orig_net = self.get_network(self.cxt, net_id)
+                orig_net = self.db_base_plugin_v2.get_network(self.cxt, net_id)
                 # update network on network controller
                 self._send_update_network(orig_net, context)
         except RemoteRestError:
@@ -283,8 +284,8 @@ class HuaweiDriver(driver_api.MechanismDriver):
                 break
             else:
                 network['gateway'] = ''
-        network[external_net.EXTERNAL] = self._network_is_external(
-                                            context, network['id'])
+        network[external_net.EXTERNAL] = self.external_net_db._network_is_external(
+            context, network['id'])
         return network
 
     def _map_state_and_status(self, resource):
@@ -299,14 +300,14 @@ class HuaweiDriver(driver_api.MechanismDriver):
     def _get_all_subnets_json_for_network(self, net_id, context=None):
         if context is None:
             context = qcontext.get_admin_context()
-        # start a sub-transaction to avoid breaking parent transactions
+            # start a sub-transaction to avoid breaking parent transactions
         with context.session.begin(subtransactions=True):
-            subnets = self._get_subnets_by_network(context,
+            subnets = self.db_base_plugin_v2._get_subnets_by_network(context,
                                                    net_id)
         subnets_details = []
         if subnets:
             for subnet in subnets:
-                subnet_dict = self._make_subnet_dict(subnet)
+                subnet_dict = self.db_base_plugin_v2._make_subnet_dict(subnet)
                 mapped_subnet = self._map_state_and_status(subnet_dict)
                 subnets_details.append(mapped_subnet)
         return subnets_details
