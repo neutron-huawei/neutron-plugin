@@ -22,16 +22,17 @@ from neutron import context as qcontext
 from neutron.db import db_base_plugin_v2, external_net_db
 from neutron.extensions import portbindings, external_net
 from neutron.openstack.common import log as logging
-from neutron.plugins.ml2.common import exceptions as ml2_exc
+from neutron.plugins.ml2.drivers.huawei import exceptions as ml2_exc
 from neutron.plugins.ml2 import driver_api
+from neutron.plugins.ml2.drivers.huawei import config
 from neutron.plugins.ml2.drivers.huawei import clients
 from neutron.plugins.ml2.drivers.huawei.clients import RemoteRestError
 
 
 LOG = logging.getLogger(__name__)
 
-sdn_UNREACHABLE_MSG = _('Unable to reach sdn')
-VXLAN_SEGMENTATION = 'vxlan'
+sdn_UNREACHABLE_MSG = "Unable to reach sdn"
+VXLAN_SEGMENTATION = "vxlan"
 
 
 class HuaweiDriver(driver_api.MechanismDriver):
@@ -43,7 +44,6 @@ class HuaweiDriver(driver_api.MechanismDriver):
     """
 
     def __init__(self):
-
         confg = cfg.CONF.ml2_Huawei
         self.segmentation_type = VXLAN_SEGMENTATION
         self.timer = None
@@ -57,7 +57,6 @@ class HuaweiDriver(driver_api.MechanismDriver):
 
     def initialize(self):
         LOG.info("huawei driver instance build...")
-        pass
 
     def create_network_postcommit(self, context):
         """Provision the network on the Huawei Hardware."""
@@ -77,7 +76,8 @@ class HuaweiDriver(driver_api.MechanismDriver):
                                                     mapped_network)
             except RemoteRestError:
                 LOG.error(sdn_UNREACHABLE_MSG)
-                raise ml2_exc.MechanismDriverError()
+                raise ml2_exc.MechanismDriverError(
+                    method="create_network_postcommit")
             msg = _('Network %s is created') % network_id
             LOG.info(msg)
 
@@ -109,7 +109,8 @@ class HuaweiDriver(driver_api.MechanismDriver):
                     self._send_update_network(new_network, context)
                 except RemoteRestError:
                     LOG.error(sdn_UNREACHABLE_MSG)
-                    raise ml2_exc.MechanismDriverError()
+                    raise ml2_exc.MechanismDriverError(
+                        method="update_network_postcommit")
                 msg = _('Network %s is updated') % network_id
                 LOG.info(msg)
 
@@ -127,7 +128,8 @@ class HuaweiDriver(driver_api.MechanismDriver):
                 self.client_sdn.rest_delete_network(tenant_id, network_id)
             except RemoteRestError:
                 LOG.error(sdn_UNREACHABLE_MSG)
-                raise ml2_exc.MechanismDriverError()
+                raise ml2_exc.MechanismDriverError(
+                    method="delete_network_postcommit")
 
     def create_port_postcommit(self, context):
         """Plug a physical host into a network.
@@ -150,7 +152,8 @@ class HuaweiDriver(driver_api.MechanismDriver):
             except RemoteRestError:
                 LOG.error("create port %s on controller failed,reason:%s"
                           % (port['id'], sdn_UNREACHABLE_MSG))
-                raise ml2_exc.MechanismDriverError()
+                raise ml2_exc.MechanismDriverError(
+                    method="create_port_postcommit")
 
             tenant_id = net["tenant_id"]
             net_id = net["id"]
@@ -162,7 +165,8 @@ class HuaweiDriver(driver_api.MechanismDriver):
             except RemoteRestError:
                 LOG.error("plug interface %s to server %s failed,reason:%s"
                           % (port['id'], device_id, sdn_UNREACHABLE_MSG))
-                raise ml2_exc.MechanismDriverError()
+                raise ml2_exc.MechanismDriverError(
+                    method="create_port_postcommit")
 
     def update_port_precommit(self, context):
         """Update the name of a given port.
@@ -204,7 +208,8 @@ class HuaweiDriver(driver_api.MechanismDriver):
         except RemoteRestError:
             LOG.error("delete port %s failed, reason:%s"
                       % (port_id, sdn_UNREACHABLE_MSG))
-            raise ml2_exc.MechanismDriverError()
+            raise ml2_exc.MechanismDriverError(
+                method="delete_port_postcommit")
 
         try:
             self.client_sdn.rest_unplug_interface(tenant_id,
@@ -213,7 +218,8 @@ class HuaweiDriver(driver_api.MechanismDriver):
         except RemoteRestError:
             LOG.error("unplug interface %s failed, reason:%s"
                       % (port['id'], sdn_UNREACHABLE_MSG))
-            raise ml2_exc.MechanismDriverError()
+            raise ml2_exc.MechanismDriverError(
+                method="delete_port_postcommit")
 
     def create_subnet_postcommit(self, context):
 
@@ -227,7 +233,8 @@ class HuaweiDriver(driver_api.MechanismDriver):
                 self._send_update_network(orig_net, context)
         except RemoteRestError:
             LOG.error(sdn_UNREACHABLE_MSG)
-            raise ml2_exc.MechanismDriverError()
+            raise ml2_exc.MechanismDriverError(
+                method="create_subnet_postcommit")
 
     def update_subnet_postcommit(self, context):
 
@@ -240,7 +247,8 @@ class HuaweiDriver(driver_api.MechanismDriver):
                 self._send_update_network(orig_net, context)
         except RemoteRestError:
             LOG.error(sdn_UNREACHABLE_MSG)
-            raise ml2_exc.MechanismDriverError()
+            raise ml2_exc.MechanismDriverError(
+                method="update_subnet_postcommit")
 
     def delete_subnet_postcommit(self, context):
 
@@ -253,7 +261,8 @@ class HuaweiDriver(driver_api.MechanismDriver):
                 self._send_update_network(orig_net, context)
         except RemoteRestError:
             LOG.error(sdn_UNREACHABLE_MSG)
-            raise ml2_exc.MechanismDriverError()
+            raise ml2_exc.MechanismDriverError(
+                method="delete_subnet_postcommit")
 
     def _synchronization_thread(self):
         with self.sdn_sync_lock:
@@ -284,8 +293,8 @@ class HuaweiDriver(driver_api.MechanismDriver):
             else:
                 network['gateway'] = ''
         network[
-            external_net.EXTERNAL] = self.external_net_db._network_is_external(
-                context, network['id'])
+            external_net.EXTERNAL] = self.external_net_db.\
+                                _network_is_external(context, network['id'])
         return network
 
     def _map_state_and_status(self, resource):

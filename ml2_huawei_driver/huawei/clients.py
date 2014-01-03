@@ -49,7 +49,7 @@ restproxy_opts = [
                       " proxy request to connect and complete.")),
 ]
 
-cfg.CONF.register_opts(restproxy_opts, "RESTPROXY")
+cfg.CONF.register_opts(restproxy_opts, "RESTCLIENT")
 
 # The following are used to invoke the API on the external controller
 NET_RESOURCE_PATH = "/tenants/%s/networks"
