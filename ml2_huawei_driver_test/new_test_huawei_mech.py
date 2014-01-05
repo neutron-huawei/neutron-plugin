@@ -466,7 +466,7 @@ class HuaweiDriverTestCase(base.BaseTestCase):
                 "tenant_id": tenant_id,
                 "id": 101,
                 "network_id": net_id
-        }
+                }
         return FakePortContext(port, port, network)
 
     def _get_subnet_context(self, tenant_id, net_id):
@@ -477,7 +477,7 @@ class HuaweiDriverTestCase(base.BaseTestCase):
                   "gateway_ip": "128.2.2.1",
                   "network_id": net_id,
                   "tenant_id": tenant_id
-        }
+                  }
         return FakeSubnetContext(subnet, subnet)
 
 

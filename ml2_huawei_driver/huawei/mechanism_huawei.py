@@ -22,11 +22,11 @@ from neutron import context as qcontext
 from neutron.db import db_base_plugin_v2, external_net_db
 from neutron.extensions import portbindings, external_net
 from neutron.openstack.common import log as logging
-from neutron.plugins.ml2.drivers.huawei import exceptions as ml2_exc
 from neutron.plugins.ml2 import driver_api
-from neutron.plugins.ml2.drivers.huawei import config
 from neutron.plugins.ml2.drivers.huawei import clients
 from neutron.plugins.ml2.drivers.huawei.clients import RemoteRestError
+from neutron.plugins.ml2.drivers.huawei import config  # noqa
+from neutron.plugins.ml2.drivers.huawei import exceptions as ml2_exc
 
 
 LOG = logging.getLogger(__name__)
@@ -293,8 +293,8 @@ class HuaweiDriver(driver_api.MechanismDriver):
             else:
                 network['gateway'] = ''
         network[
-            external_net.EXTERNAL] = self.external_net_db.\
-                                _network_is_external(context, network['id'])
+            external_net.EXTERNAL] = self.external_net_db. \
+            _network_is_external(context, network['id'])
         return network
 
     def _map_state_and_status(self, resource):
